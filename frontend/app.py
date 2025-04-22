@@ -3,13 +3,18 @@ import requests
 import os
 import pycountry
 
-# Initialize session state
-if "summary" not in st.session_state:
-    st.session_state["summary"] = ""
-    st.session_state["precautions"] = []
-    st.session_state["medications"] = []
+# Initialize session state for six sections
+if "instructions" not in st.session_state:
+    st.session_state.update({
+        "instructions": [],
+        "importance":   [],
+        "follow_up":    [],
+        "medications":  [],
+        "precautions":  [],
+        "references":   []
+    })
 
-# Build a sorted list of ISO‑639 language names
+# Build language list via pycountry
 languages = sorted(
     {lang.name for lang in pycountry.languages if hasattr(lang, "alpha_2")}
 )
@@ -17,14 +22,15 @@ languages = sorted(
 API_URL = os.getenv("BACKEND_URL", "http://localhost:8000") + "/simplify"
 
 st.title("Discharge Instructions Simplifier")
-col1, col2 = st.columns(2)
 
-with col1:
+# ————— Sidebar for settings & input —————
+with st.sidebar:
     st.header("Settings")
     language = st.selectbox("Choose Language:", languages)
 
     st.header("Input Method")
-    method = st.radio("", ("Enter Text", "Upload File"))
+    method = st.radio("Select input method:", ("Enter Text", "Upload File"), label_visibility="visible")
+
     text_input = ""
     file_content = ""
     if method == "Enter Text":
@@ -38,7 +44,7 @@ with col1:
     if st.button("Simplify"):
         payload = text_input if method == "Enter Text" else file_content
         if not payload.strip():
-            st.warning("Please enter text or upload a file.")
+            st.sidebar.warning("Please enter text or upload a file.")
         else:
             with st.spinner("Processing…"):
                 try:
@@ -48,47 +54,63 @@ with col1:
                     )
                     if res.status_code == 200:
                         data = res.json()
-                        st.session_state["summary"]     = data["summary"]
-                        st.session_state["precautions"] = data["precautions"]
-                        st.session_state["medications"] = data["medications"]
+                        st.session_state["instructions"] = data.get("instructions", [])
+                        st.session_state["importance"]   = data.get("importance", [])
+                        st.session_state["follow_up"]    = data.get("follow_up", [])
+                        st.session_state["medications"]  = data.get("medications", [])
+                        st.session_state["precautions"]  = data.get("precautions", [])
+                        st.session_state["references"]   = data.get("references", [])
                     else:
-                        st.error(f"Backend error {res.status_code}: {res.text}")
+                        st.sidebar.error(f"Backend error {res.status_code}: {res.text}")
                 except Exception as e:
-                    st.error(f"Request failed: {e}")
+                    st.sidebar.error(f"Request failed: {e}")
 
-with col2:
-    st.header("Simplified Output")
-    has_content = False
+# ————— Main area for output —————
+st.header("Simplified Output")
 
-    # — Summary (cleaned) —
-    raw_summary = st.session_state.get("summary", "")
-    if raw_summary:
-        has_content = True
-        clean = raw_summary.replace("Summary:", "").split("Precautions:")[0].strip()
-        st.subheader("Summary")
-        st.markdown(f"- {clean}")
+has_content = False
 
-    # — Precautions —
-    precs = st.session_state.get("precautions", [])
-    if precs:
-        has_content = True
-        st.subheader("Precautions")
-        for p in precs:
-            st.markdown(f"- {p}")
+# Simplified Instructions
+if st.session_state["instructions"]:
+    has_content = True
+    st.subheader("Instructions")
+    for s in st.session_state["instructions"]:
+        st.markdown(f"- {s}")
 
-    # — Medications / Tasks —
-    meds = st.session_state.get("medications", [])
-    if meds:
-        has_content = True
-        st.subheader("Medications / Tasks")
-        for m in meds:
-            if isinstance(m, dict):
-                sym = m["symptom"].title()
-                med = m["medication"]
-                instr = m["instructions"]
-                st.markdown(f"- **{sym}:** {med}. {instr}")
-            else:
-                st.markdown(f"- {m}")
+# Importance
+if st.session_state["importance"]:
+    has_content = True
+    st.subheader("Importance")
+    for imp in st.session_state["importance"]:
+        st.markdown(f"- {imp}")
 
-    if not has_content:
-        st.info("Your simplified output will appear here.")
+# Follow‑Up Tasks
+if st.session_state["follow_up"]:
+    has_content = True
+    st.subheader("Follow‑Up Appointments or Tasks")
+    for f in st.session_state["follow_up"]:
+        st.markdown(f"- {f}")
+
+# Medications
+if st.session_state["medications"]:
+    has_content = True
+    st.subheader("Medications")
+    for m in st.session_state["medications"]:
+        st.markdown(f"- {m}")
+
+# Precautions
+if st.session_state["precautions"]:
+    has_content = True
+    st.subheader("Precautions")
+    for p in st.session_state["precautions"]:
+        st.markdown(f"- {p}")
+
+# References
+if st.session_state["references"]:
+    has_content = True
+    st.subheader("References")
+    for r in st.session_state["references"]:
+        st.markdown(f"- {r}")
+
+if not has_content:
+    st.info("Your simplified output will appear here.")

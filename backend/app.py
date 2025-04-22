@@ -28,11 +28,14 @@ def upload_file(file: UploadFile = File(...)):
 
 @app.post("/simplify", response_model=SimplifyResponse)
 def simplify(req: SimplifyRequest):
-    summary, precautions, medications = simplify_instructions(req.raw_text, req.language)
+    instr, imp, fu, meds, precs, refs = simplify_instructions(req.raw_text, req.language)
     return {
-        "summary": summary,
-        "precautions": precautions,
-        "medications": medications
+        "instructions": instr,
+        "importance":   imp,
+        "follow_up":    fu,
+        "medications":  meds,
+        "precautions":  precs,
+        "references":   refs,
     }
     
 @app.get("/health")
