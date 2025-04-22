@@ -1,50 +1,94 @@
 import streamlit as st
 import requests
+import os
+import pycountry
+
+# Initialize session state
+if "summary" not in st.session_state:
+    st.session_state["summary"] = ""
+    st.session_state["precautions"] = []
+    st.session_state["medications"] = []
+
+# Build a sorted list of ISO‑639 language names
+languages = sorted(
+    {lang.name for lang in pycountry.languages if hasattr(lang, "alpha_2")}
+)
+
+API_URL = os.getenv("BACKEND_URL", "http://localhost:8000") + "/simplify"
 
 st.title("Discharge Instructions Simplifier")
-
-API_ENDPOINT = "http://localhost:8000/simplify"
 col1, col2 = st.columns(2)
 
 with col1:
-    st.header("Choose Input Method")
-    input_method = st.radio(" ", ("Enter Text", "Upload File"))
+    st.header("Settings")
+    language = st.selectbox("Choose Language:", languages)
 
+    st.header("Input Method")
+    method = st.radio("", ("Enter Text", "Upload File"))
     text_input = ""
     file_content = ""
-
-    if input_method == "Enter Text":
+    if method == "Enter Text":
         text_input = st.text_area("Paste Discharge Instruction:")
-    elif input_method == "Upload File":
-        uploaded_file = st.file_uploader("Choose a file (.txt or .json)", type=['txt', 'json'])
-        if uploaded_file:
-            file_content = uploaded_file.read().decode("utf-8")
-            st.write(f"Uploaded file: {uploaded_file.name}")
+    else:
+        uploaded = st.file_uploader("Choose a .txt or .json file", type=["txt", "json"])
+        if uploaded:
+            file_content = uploaded.read().decode("utf-8")
+            st.write(f"Uploaded: {uploaded.name}")
 
     if st.button("Simplify"):
-        content_to_send = text_input if input_method == "Enter Text" else file_content
-
-        if not content_to_send.strip():
-            st.warning("No input provided. Please enter text or upload a file.")
+        payload = text_input if method == "Enter Text" else file_content
+        if not payload.strip():
+            st.warning("Please enter text or upload a file.")
         else:
-            with st.spinner("Processing with backend..."):
-                st.session_state["result"] = None
+            with st.spinner("Processing…"):
                 try:
-                    res = requests.post(API_ENDPOINT, json={"text": content_to_send})
+                    res = requests.post(
+                        API_URL,
+                        json={"raw_text": payload, "language": language}
+                    )
                     if res.status_code == 200:
-                        st.session_state["result"] = res.json().get("result", "No result found.")
+                        data = res.json()
+                        st.session_state["summary"]     = data["summary"]
+                        st.session_state["precautions"] = data["precautions"]
+                        st.session_state["medications"] = data["medications"]
                     else:
-                        st.session_state["result"] = f"Backend error: {res.status_code} - {res.text}"
+                        st.error(f"Backend error {res.status_code}: {res.text}")
                 except Exception as e:
-                    st.session_state["result"] = str(e)
-     
-                
+                    st.error(f"Request failed: {e}")
 
 with col2:
-    st.header("Simplified Instruction:")
-    if st.session_state.get("result"):
-                    # st.subheader("")
-        st.write(st.session_state["result"])
-    else:
-        st.info("Your simplified result will appear here after submission.")
+    st.header("Simplified Output")
+    has_content = False
 
+    # — Summary (cleaned) —
+    raw_summary = st.session_state.get("summary", "")
+    if raw_summary:
+        has_content = True
+        clean = raw_summary.replace("Summary:", "").split("Precautions:")[0].strip()
+        st.subheader("Summary")
+        st.markdown(f"- {clean}")
+
+    # — Precautions —
+    precs = st.session_state.get("precautions", [])
+    if precs:
+        has_content = True
+        st.subheader("Precautions")
+        for p in precs:
+            st.markdown(f"- {p}")
+
+    # — Medications / Tasks —
+    meds = st.session_state.get("medications", [])
+    if meds:
+        has_content = True
+        st.subheader("Medications / Tasks")
+        for m in meds:
+            if isinstance(m, dict):
+                sym = m["symptom"].title()
+                med = m["medication"]
+                instr = m["instructions"]
+                st.markdown(f"- **{sym}:** {med}. {instr}")
+            else:
+                st.markdown(f"- {m}")
+
+    if not has_content:
+        st.info("Your simplified output will appear here.")

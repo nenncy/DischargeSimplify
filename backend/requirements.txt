@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+pydantic
+boto3
+pdfminer.six
+openai
+python-multipart
+python-dotenv

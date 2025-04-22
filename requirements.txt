@@ -1,8 +1,0 @@
-# Backend
-fastapi
-uvicorn
-requests
-python-dotenv
-
-# Frontend
-streamlit
