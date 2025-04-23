@@ -9,6 +9,16 @@ class SimplifyRequest(BaseModel):
     raw_text: str
     language: str
 
+class validateRequest(BaseModel):
+    simplified_text: str
+    original_text: str
+
+class validateResponse(BaseModel):
+    simplified_text: str
+    is_valid: bool
+    explanation: str
+
+
 class SimplifyResponse(BaseModel):
     instructions: List[str]
     importance:   List[str]

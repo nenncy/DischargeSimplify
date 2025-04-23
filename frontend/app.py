@@ -19,14 +19,14 @@ languages = sorted(
     {lang.name for lang in pycountry.languages if hasattr(lang, "alpha_2")}
 )
 
-API_URL = os.getenv("BACKEND_URL", "http://localhost:8000") + "/simplify"
+API_URL = os.getenv("BACKEND_URL", "http://localhost:8000") 
 
 st.title("Discharge Instructions Simplifier")
 
 # ————— Sidebar for settings & input —————
 with st.sidebar:
     st.header("Settings")
-    language = st.selectbox("Choose Language:", languages)
+    language = st.selectbox("Choose Language:", languages , index=languages.index("English"), label_visibility="visible")
 
     st.header("Input Method")
     method = st.radio("Select input method:", ("Enter Text", "Upload File"), label_visibility="visible")
@@ -49,7 +49,7 @@ with st.sidebar:
             with st.spinner("Processing…"):
                 try:
                     res = requests.post(
-                        API_URL,
+                        API_URL + "/simplify",
                         json={"raw_text": payload, "language": language}
                     )
                     if res.status_code == 200:
@@ -65,6 +65,48 @@ with st.sidebar:
                 except Exception as e:
                     st.sidebar.error(f"Request failed: {e}")
 
+
+def validate(idx: int, text: str, section: str):
+    key_prefix = f"{section}_{idx}"
+    col1, col2 = st.columns([5, 1])
+
+    with col1:
+        st.markdown(f"- {text}")
+    with col2:
+        if st.button("Validate", key=f"validate_{key_prefix}"):
+            st.session_state[f"show_trace_{key_prefix}"] = True
+
+    # Show popup-like expander if opened
+    if st.session_state.get(f"show_trace_{key_prefix}", False):
+        with st.expander("📌 Original Statement", expanded=True):
+            # Optional: Replace this with real API call to /trace
+            st.markdown("_Fetching source..._")
+            response = requests.post(
+                API_URL + "/validate",
+                json={
+                    "simplified_text": text,
+                    "original_text": text_input or file_content
+                }
+            )
+
+            # Example live fetch (uncomment if backend is ready):
+            # response = requests.post("http://localhost:8000/trace", json={
+            #     "simplified_text": text,
+            #     "original_text": text_input or file_content
+            # })
+            if response.status_code == 200:
+                result = response.json()
+                print(result,"***********")
+                # st.markdown(f"**Simplified Instruction:** {result.get('simplified_text')}")
+                st.markdown(f"**Match Found:** {'✅ Yes' if result.get('is_valid') else '❌ No'}")
+                st.markdown(f"**Explanation:** {result.get('explanation')}")
+
+            else:
+                st.warning("Error fetching source.")
+
+            if st.button("Close", key=f"close_{key_prefix}"):
+                st.session_state[f"show_trace_{key_prefix}"] = False
+
 # ————— Main area for output —————
 st.header("Simplified Output")
 
@@ -74,43 +116,60 @@ has_content = False
 if st.session_state["instructions"]:
     has_content = True
     st.subheader("Instructions")
-    for s in st.session_state["instructions"]:
-        st.markdown(f"- {s}")
+    for idx, imp in enumerate(st.session_state["instructions"]):
+        validate(idx, imp, "Instructions")
+        # col1, col2 = st.columns([5, 1])
+        # with col1:
+        #     st.markdown(f"- {imp}")
+        # with col2:
+        #     st.button("Validate", key=f"validate_Instructions_{idx}")
+    # for s in st.session_state["instructions"]:
+    #     st.markdown(f"- {s}")
 
 # Importance
 if st.session_state["importance"]:
     has_content = True
     st.subheader("Importance")
-    for imp in st.session_state["importance"]:
-        st.markdown(f"- {imp}")
+    for idx, imp in enumerate(st.session_state["importance"]):
+        validate(idx, imp, "importance")
+    # for imp in st.session_state["importance"]:
+    #     st.markdown(f"- {imp}")
 
 # Follow‑Up Tasks
 if st.session_state["follow_up"]:
     has_content = True
     st.subheader("Follow‑Up Appointments or Tasks")
-    for f in st.session_state["follow_up"]:
-        st.markdown(f"- {f}")
+    for idx, imp in enumerate(st.session_state["follow_up"]):
+        validate(idx, imp, "follow_up")
+    # for f in st.session_state["follow_up"]:
+    #     st.markdown(f"- {f}")
 
 # Medications
 if st.session_state["medications"]:
     has_content = True
     st.subheader("Medications")
-    for m in st.session_state["medications"]:
-        st.markdown(f"- {m}")
+    for idx, imp in enumerate(st.session_state["medications"]):
+        validate(idx, imp, "medications")
+    # for m in st.session_state["medications"]:
+    #     st.markdown(f"- {m}")
 
 # Precautions
 if st.session_state["precautions"]:
     has_content = True
     st.subheader("Precautions")
-    for p in st.session_state["precautions"]:
-        st.markdown(f"- {p}")
+    for idx, imp in enumerate(st.session_state["precautions"]):
+        validate(idx, imp, "precautions")
+    # for p in st.session_state["precautions"]:
+    #     st.markdown(f"- {p}")
 
 # References
 if st.session_state["references"]:
     has_content = True
     st.subheader("References")
-    for r in st.session_state["references"]:
-        st.markdown(f"- {r}")
+    for idx, imp in enumerate(st.session_state["references"]):
+        validate(idx, imp, "references")
+    # for r in st.session_state["references"]:
+    #     st.markdown(f"- {r}")
 
 if not has_content:
     st.info("Your simplified output will appear here.")

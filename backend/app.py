@@ -1,9 +1,9 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-from models import UploadResponse, SimplifyRequest, SimplifyResponse
+from models import UploadResponse, SimplifyRequest, SimplifyResponse , validateRequest , validateResponse
 from utils import save_file_locally, extract_text_from_file
-from prompt_engineer import simplify_instructions
+from prompt_engineer import simplify_instructions, validate_instructions
 import os
 
 # Load environment
@@ -37,7 +37,26 @@ def simplify(req: SimplifyRequest):
         "precautions":  precs,
         "references":   refs,
     }
-    
+
+@app.post("/validate", response_model=validateResponse)
+def validate(req: validateRequest):
+    is_valid, explanation, simplified_text = validate_instructions(req.original_text, req.simplified_text)
+    ans = {
+        "is_valid": is_valid,
+        "explanation": explanation,
+        "simplified_text": simplified_text,
+
+    }
+    # Check if the response is valid    
+    print(ans, "***********")
+    return {
+        "is_valid": is_valid,
+        "explanation": explanation,
+        "simplified_text": simplified_text,
+        # "original_text": original_text
+    }
+   
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}

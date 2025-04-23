@@ -1,8 +1,8 @@
 import os, json, openai, time, random
 from dotenv import load_dotenv, find_dotenv
 from ratelimit import limits, sleep_and_retry
-from openai.error import RateLimitError
-
+from openai import RateLimitError
+import re
 _ = load_dotenv(find_dotenv(), override=True)
 print("🔑 Using OPENAI_API_KEY=", os.getenv("OPENAI_API_KEY"))
 
@@ -13,10 +13,10 @@ MAX_CALLS_PER_MINUTE = 20
 
 @sleep_and_retry
 @limits(calls=MAX_CALLS_PER_MINUTE, period=ONE_MINUTE)
-def _call_openai_with_rate_limit(prompt: str, model: str = "gpt-3.5-turbo", temperature: float = 0.7):
+def _call_openai_with_rate_limit(prompt: str, model: str = "gpt-4o", temperature: float = 0.7):
     """Call OpenAI, automatically sleeping if you exceed MAX_CALLS_PER_MINUTE."""
     try:
-        return openai.ChatCompletion.create(
+        return openai.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
             temperature=temperature,
@@ -45,14 +45,14 @@ def simplify_instructions(text: str, language: str = "English"):
         f"{text}\n"
     )
 
-    resp = _call_openai_with_rate_limit(prompt, model="gpt-3.5-turbo", temperature=0.7)
+    resp = _call_openai_with_rate_limit(prompt, model="gpt-4o", temperature=0.7)
 
     raw = getattr(resp.choices[0], "message", resp.choices[0]).content
     print("LLM RAW JSON →", raw)
 
     # parse JSON
     try:
-        obj = json.loads(raw)
+        obj = extract_json(raw)
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON from LLM: {e}\nRaw output:\n{raw}")
 
@@ -64,3 +64,64 @@ def simplify_instructions(text: str, language: str = "English"):
     references      = obj.get("References", [])
 
     return instructions, importance, follow_up_tasks, medications, precautions, references
+
+
+
+
+def extract_json(raw_output: str) -> dict:
+    """
+    Safely extracts and parses JSON from an LLM response.
+    Handles Markdown-style triple backticks and non-JSON text.
+    """
+    if not raw_output.strip():
+        raise ValueError("LLM returned an empty response.")
+
+    # Remove triple backticks and extract only JSON content
+    match = re.search(r"\{[\s\S]+\}", raw_output)
+    if match:
+        raw_output = match.group(0)
+
+    try:
+        return json.loads(raw_output)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Failed to parse JSON from LLM: {e}\nRaw output:\n{raw_output}")
+    
+
+def validate_instructions(original_text: str, simplified_text: str):
+    print(simplified_text, original_text ,"************")
+    prompt = (
+        "You are a helpful medical assistant.\n"
+        "You have two sets of discharge instructions: the original and the simplified version.\n"
+        "Your task is to check is the simplified text context is present in the original.\n\n"
+        "The original instructions are:\n"
+        f"{original_text}\n\n"
+        "The simplified instructions are:\n"
+        f"{simplified_text}\n\n"
+        "Please provide a JSON object with the following keys:\n"
+        "  \"is_valid\": true or false, indicating if the simplified version is present.\n"
+        "  \"explanation\": a brief explanation of why it is valid or not.\n\n"
+    )
+
+    resp = _call_openai_with_rate_limit(prompt, model="gpt-4o", temperature=0.7)
+
+    raw = getattr(resp.choices[0], "message", resp.choices[0]).content
+    print("LLM RAW JSON →", raw)
+
+    # parse JSON
+    try:
+        obj = extract_json(raw)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON from LLM: {e}\nRaw output:\n{raw}")
+
+    is_valid = obj.get("is_valid", False)
+    explanation = obj.get("explanation", "")
+    simplified_text = obj.get("simplified_text", "")
+
+    return is_valid, explanation, simplified_text    
+
+    # return {
+    #     "simplified_text": simplified_text,
+    #     "original_text": original_text,
+    #     "is_valid": is_valid,
+    #     "explanation": explanation
+    # }
