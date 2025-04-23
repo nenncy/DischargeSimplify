@@ -16,3 +16,11 @@ class SimplifyResponse(BaseModel):
     medications:  List[str]
     precautions:  List[str]
     references:   List[str]
+
+class ChatRequest(BaseModel):
+    user_id: str
+    user_message: str
+    context: list[str]           # note: a single string of all your simplified notes
+
+class ChatResponse(BaseModel):
+    reply: str
