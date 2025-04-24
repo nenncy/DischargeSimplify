@@ -10,12 +10,14 @@ class SimplifyRequest(BaseModel):
     language: str
 
 class SimplifyResponse(BaseModel):
+    summary:      str
     instructions: List[str]
     importance:   List[str]
     follow_up:    List[str]
     medications:  List[str]
     precautions:  List[str]
     references:   List[str]
+    disclaimer:   str
 
 class ChatRequest(BaseModel):
     user_id: str

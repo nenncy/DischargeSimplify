@@ -1,4 +1,6 @@
-import os, openai, asyncio
+import os
+import openai
+import asyncio
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,11 +17,8 @@ from prompt_engineer import simplify_instructions
 
 # Load environment
 load_dotenv()
-
 openai.api_key = os.getenv("OPENAI_API_KEY")
-ASSISTANT_ID    = os.getenv("ASSISTANT_ID")  # set by your create_assistant.py run
-ASSISTANTS_URL  = f"https://api.openai.com/v1/assistants/{ASSISTANT_ID}/chat/run"
-BASE_URL     = "https://api.openai.com/v1"
+ASSISTANT_ID = os.getenv("ASSISTANT_ID")
 
 app = FastAPI()
 app.add_middleware(
@@ -29,6 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Async client for assistant chat
 client = AsyncOpenAI(api_key=openai.api_key)
 
 @app.post("/upload", response_model=UploadResponse)
@@ -42,22 +42,28 @@ def upload_file(file: UploadFile = File(...)):
 
 @app.post("/simplify", response_model=SimplifyResponse)
 def simplify(req: SimplifyRequest):
-    instr, imp, fu, meds, precs, refs = simplify_instructions(req.raw_text, req.language)
+    print("🔍 Received simplify request: language =", req.language)
+    summary, instr, imp, fu, meds, precs, refs, disclaimer = simplify_instructions(
+        req.raw_text,
+        req.language
+    )
     return {
+        "summary":      summary,
         "instructions": instr,
         "importance":   imp,
         "follow_up":    fu,
         "medications":  meds,
         "precautions":  precs,
         "references":   refs,
+        "disclaimer":   disclaimer,
     }
 
 @app.post("/assistant/chat", response_model=ChatResponse)
 async def assistant_chat(req: ChatRequest):
-    # 1) start a new thread
+    # 1) create thread
     thread = await client.beta.threads.create()
 
-    # 2) send context + question as one "user" message
+    # 2) post context+question as a single user message
     combined = (
         "Context (simplified instructions):\n"
         + "\n".join(req.context)
@@ -70,13 +76,13 @@ async def assistant_chat(req: ChatRequest):
         content=combined
     )
 
-    # 3) invoke the assistant
+    # 3) run the assistant
     run = await client.beta.threads.runs.create(
         thread_id=thread.id,
         assistant_id=ASSISTANT_ID
     )
 
-    # 4) poll until done
+    # 4) poll until it's done
     while run.status not in ("completed", "failed"):
         await asyncio.sleep(0.5)
         run = await client.beta.threads.runs.retrieve(
@@ -87,17 +93,14 @@ async def assistant_chat(req: ChatRequest):
     if run.status != "completed":
         raise HTTPException(500, f"Assistant run failed: {run.status}")
 
-    # 5) fetch the conversation
+    # 5) fetch the messages and return the assistant’s response
     msgs = await client.beta.threads.messages.list(thread_id=thread.id)
-
-    # 6) return the last assistant reply
     assistant_msg = next(
         (m.content[0].text.value for m in msgs.data if m.role == "assistant"),
         ""
     )
     return {"reply": assistant_msg}
 
-    
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
