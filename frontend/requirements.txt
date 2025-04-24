@@ -1,5 +1,0 @@
-streamlit
-requests
-python-dotenv
-pycountry
-googletrans==4.0.0-rc1
