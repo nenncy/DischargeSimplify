@@ -13,7 +13,7 @@ MAX_CALLS_PER_MINUTE = 20
 
 @sleep_and_retry
 @limits(calls=MAX_CALLS_PER_MINUTE, period=ONE_MINUTE)
-def _call_openai_with_rate_limit(prompt: str, model: str = "gpt-3.5-turbo", temperature: float = 0.7):
+def _call_openai_with_rate_limit(prompt: str, model: str = "gpt-3.5-turbo", temperature: float = 0.0):
     """Call OpenAI, automatically sleeping if you exceed MAX_CALLS_PER_MINUTE."""
     return openai.chat.completions.create(
         model=model,
