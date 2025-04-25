@@ -19,6 +19,16 @@ languages = sorted(
     {lang.name for lang in pycountry.languages if hasattr(lang, "alpha_2")}
 )
 
+
+@st.dialog("Original Content")
+def open_content(text_input: str, file_content: str):
+    st.markdown("### Original Content")
+    if text_input:
+        st.markdown(f"**Text Input:**\n{text_input}")
+    if file_content:
+        st.markdown(f"**File Content:**\n{file_content}")
+
+
 API_URL = os.getenv("BACKEND_URL", "http://localhost:8000") 
 
 st.title("Discharge Instructions Simplifier")
@@ -40,6 +50,12 @@ with st.sidebar:
         if uploaded:
             file_content = uploaded.read().decode("utf-8")
             st.write(f"Uploaded: {uploaded.name}")
+    
+    # st.button("View Original Content")
+    if st.button("View Original Content", key="view_original_button"):
+        open_content(text_input, file_content)
+
+
 
     if st.button("Simplify"):
         payload = text_input if method == "Enter Text" else file_content
@@ -64,6 +80,8 @@ with st.sidebar:
                         st.sidebar.error(f"Backend error {res.status_code}: {res.text}")
                 except Exception as e:
                     st.sidebar.error(f"Request failed: {e}")
+
+
 
 
 # def validate(idx: int, text: str, section: str):
