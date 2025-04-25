@@ -1,270 +1,175 @@
-import streamlit as st
-import requests
 import os
+import requests
 import pycountry
+import streamlit as st
+from dotenv import load_dotenv, find_dotenv
 
-# Initialize session state for six sections
-if "instructions" not in st.session_state:
+# ─── Page config & environment ─────────────────────────────────────────────────
+st.set_page_config(page_title="Discharge Helper", layout="wide")
+load_dotenv(find_dotenv(), override=True)
+
+# ─── Backend endpoints ─────────────────────────────────────────────────────────
+BASE_URL     = os.getenv("BACKEND_URL", "http://localhost:8000")
+SIMPLIFY_URL = f"{BASE_URL}/simplify"
+CHAT_URL     = f"{BASE_URL}/assistant/chat"
+VALIDATE_URL = f"{BASE_URL}/validate"
+
+# ─── Full language list ─────────────────────────────────────────────────────────
+languages = sorted([lang.name for lang in pycountry.languages if hasattr(lang, "alpha_2")])
+
+# ─── Session state init ───────────────────────────────────────────────────────
+if "raw_text" not in st.session_state:
     st.session_state.update({
-        "instructions": [],
-        "importance":   [],
-        "follow_up":    [],
-        "medications":  [],
-        "precautions":  [],
-        "references":   []
+        "raw_text":          "",
+        "file_content":      "",
+        "summary":           "",
+        "instructions":      [],
+        "importance":        [],
+        "follow_up":         [],
+        "medications":       [],
+        "precautions":       [],
+        "references":        [],
+        "disclaimer":        "",
+        "chat_history":      [],
+        "selected_language": "English"
     })
 
-# Build language list via pycountry
-languages = sorted(
-    {lang.name for lang in pycountry.languages if hasattr(lang, "alpha_2")}
+# ─── Simplify function ────────────────────────────────────────────────────────
+def do_simplify():
+    txt = st.session_state["raw_text"].strip()
+    lang = st.session_state["selected_language"]
+    if not txt:
+        return
+    try:
+        res = requests.post(
+            SIMPLIFY_URL,
+            json={"raw_text": txt, "language": lang},
+            timeout=60
+        )
+        res.raise_for_status()
+        d = res.json()
+        st.session_state.update({
+            "summary":      d.get("summary", ""),
+            "instructions": d.get("instructions", []),
+            "importance":   d.get("importance", []),
+            "follow_up":    d.get("follow_up", []),
+            "medications":  d.get("medications", []),
+            "precautions":  d.get("precautions", []),
+            "references":   d.get("references", []),
+            "disclaimer":   d.get("disclaimer", ""),
+            "chat_history": []
+        })
+    except Exception as e:
+        st.error(f"Simplify error: {e}")
+
+# ─── Header & language selector ────────────────────────────────────────────────
+col1, col2 = st.columns([3, 1])
+col1.title("Discharge Instructions Simplifier & Assistant")
+with col2:
+    st.markdown("**Language**")
+    st.selectbox(
+        "",
+        options=languages,
+        key="selected_language",
+        on_change=do_simplify,
+        label_visibility="collapsed"
+    )
+
+# ─── Sidebar: Input & Controls ─────────────────────────────────────────────────
+with st.sidebar:
+    st.header("Discharge Instructions Input")
+    method = st.radio("Input method:", ("Enter text", "Upload file"))
+    if method == "Enter text":
+        st.text_area(
+            "Paste or edit here:",
+            value=st.session_state["raw_text"],
+            key="raw_text",
+            height=200
+        )
+        st.session_state["file_content"] = ""
+    else:
+        uploaded = st.file_uploader(
+            "Choose .txt or .json:",
+            type=["txt", "json"]
+        )
+        if uploaded:
+            content = uploaded.read().decode("utf-8")
+            st.session_state["raw_text"] = content
+            st.session_state["file_content"] = content
+    if st.button("View Original Content"):
+        with st.expander("Original Content", expanded=True):
+            st.markdown(f"**Text Input:**\n{st.session_state['raw_text']}")
+            if st.session_state.get("file_content"):
+                st.markdown(f"**File Content:**\n{st.session_state['file_content']}")
+    if st.button("Simplify"):
+        do_simplify()
+
+# ─── Main: Simplified Output ──────────────────────────────────────────────────
+st.header("Simplified Output")
+if st.session_state.get("summary"):
+    st.subheader("Summary")
+    st.write(st.session_state["summary"])
+
+VALIDATE = lambda item: requests.post(
+    VALIDATE_URL,
+    json={"simplified_text": item, "original_text": st.session_state["raw_text"]},
+    timeout=30
 )
 
-
-@st.dialog("Original Content")
-def open_content(text_input: str, file_content: str):
-    st.markdown("### Original Content")
-    if text_input:
-        st.markdown(f"**Text Input:**\n{text_input}")
-    if file_content:
-        st.markdown(f"**File Content:**\n{file_content}")
-
-
-API_URL = os.getenv("BACKEND_URL", "http://localhost:8000") 
-
-st.title("Discharge Instructions Simplifier")
-
-# ————— Sidebar for settings & input —————
-with st.sidebar:
-    st.header("Settings")
-    language = st.selectbox("Choose Language:", languages , index=languages.index("English"), label_visibility="visible")
-
-    st.header("Input Method")
-    method = st.radio("Select input method:", ("Enter Text", "Upload File"), label_visibility="visible")
-
-    text_input = ""
-    file_content = ""
-    if method == "Enter Text":
-        text_input = st.text_area("Paste Discharge Instruction:")
-    else:
-        uploaded = st.file_uploader("Choose a .txt or .json file", type=["txt", "json"])
-        if uploaded:
-            file_content = uploaded.read().decode("utf-8")
-            st.write(f"Uploaded: {uploaded.name}")
-    
-    # st.button("View Original Content")
-    if st.button("View Original Content", key="view_original_button"):
-        open_content(text_input, file_content)
-
-
-
-    if st.button("Simplify"):
-        payload = text_input if method == "Enter Text" else file_content
-        if not payload.strip():
-            st.sidebar.warning("Please enter text or upload a file.")
-        else:
-            with st.spinner("Processing…"):
-                try:
-                    res = requests.post(
-                        API_URL + "/simplify",
-                        json={"raw_text": payload, "language": language}
-                    )
+def display_section(title, items, key):
+    if not items:
+        return
+    col1, col2 = st.columns([5, 1])
+    with col1:
+        st.subheader(title)
+    with col2:
+        if st.button("Validate All", key=f"validate_{key}"):
+            with st.expander("Validation Report", expanded=True):
+                for item in items:
+                    res = VALIDATE(item)
                     if res.status_code == 200:
-                        data = res.json()
-                        st.session_state["instructions"] = data.get("instructions", [])
-                        st.session_state["importance"]   = data.get("importance", [])
-                        st.session_state["follow_up"]    = data.get("follow_up", [])
-                        st.session_state["medications"]  = data.get("medications", [])
-                        st.session_state["precautions"]  = data.get("precautions", [])
-                        st.session_state["references"]   = data.get("references", [])
+                        r = res.json()
+                        st.markdown(f"- **{item}**")
+                        st.markdown(f"  Match Found: {'✅' if r.get('is_valid') else '❌'}")
+                        st.markdown(f"  Explanation: _{r.get('explanation','')}_")
                     else:
-                        st.sidebar.error(f"Backend error {res.status_code}: {res.text}")
-                except Exception as e:
-                    st.sidebar.error(f"Request failed: {e}")
+                        st.markdown(f"- ❌ Error validating: {item}")
+    for itm in items:
+        st.markdown(f"- {itm}")
 
+display_section("Instructions", st.session_state["instructions"], "instructions")
+display_section("Importance", st.session_state["importance"], "importance")
+display_section("Follow-Up Tasks", st.session_state["follow_up"], "follow_up")
+display_section("Medications", st.session_state["medications"], "medications")
+display_section("Precautions", st.session_state["precautions"], "precautions")
+display_section("References", st.session_state["references"], "references")
 
+if st.session_state.get("disclaimer"):
+    st.subheader("Disclaimer")
+    st.write(st.session_state["disclaimer"])
 
-
-# def validate(idx: int, text: str, section: str):
-#     key_prefix = f"{section}_{idx}"
-#     col1, col2 = st.columns([5, 1])
-
-#     with col1:
-#         st.markdown(f"- {text}")
-#     with col2:
-#         if st.button("Validate", key=f"validate_{key_prefix}"):
-#             st.session_state[f"show_trace_{key_prefix}"] = True
-
-#     # Show popup-like expander if opened
-#     if st.session_state.get(f"show_trace_{key_prefix}", False):
-#         with st.expander("📌 Original Statement", expanded=True):
-#             # Optional: Replace this with real API call to /trace
-#             st.markdown("_Fetching source..._")
-#             response = requests.post(
-#                 API_URL + "/validate",
-#                 json={
-#                     "simplified_text": text,
-#                     "original_text": text_input or file_content
-#                 }
-#             )
-
-#             # Example live fetch (uncomment if backend is ready):
-#             # response = requests.post("http://localhost:8000/trace", json={
-#             #     "simplified_text": text,
-#             #     "original_text": text_input or file_content
-#             # })
-#             if response.status_code == 200:
-#                 result = response.json()
-#                 print(result,"***********")
-#                 # st.markdown(f"**Simplified Instruction:** {result.get('simplified_text')}")
-#                 st.markdown(f"**Match Found:** {'✅ Yes' if result.get('is_valid') else '❌ No'}")
-#                 st.markdown(f"**Explanation:** {result.get('explanation')}")
-
-#             else:
-#                 st.warning("Error fetching source.")
-
-#             if st.button("Close", key=f"close_{key_prefix}"):
-#                 st.session_state[f"show_trace_{key_prefix}"] = False
-
-@st.dialog("Validate Simplified Instructions")
-def validate_section(items: list, idx: int, original_text: str):
-    # key_prefix = f"{section_name}_{idx}"
-    st.markdown("_Fetching source..._")
-    for item in items:
-                
-                response = requests.post(
-                    API_URL + "/validate",
+# ─── Chat Assistant ───────────────────────────────────────────────────────────
+if st.session_state.get("instructions"):
+    st.markdown("---")
+    st.header("Assistant Chat")
+    q = st.text_input("Ask a follow-up question:", key="chat_input")
+    if st.button("Send", key="btn_chat"):
+        if q.strip():
+            try:
+                resp = requests.post(
+                    CHAT_URL,
                     json={
-                        "simplified_text": item,
-                        "original_text": original_text
-                    }
+                        "user_id": "user1",
+                        "user_message": q,
+                        "context": st.session_state["instructions"]
+                    },
+                    timeout=30
                 )
-                if response.status_code == 200:
-                    result = response.json()
-                    st.markdown(f"- **{item}**")
-                    st.markdown(f"  Match Found: {'✅' if result['is_valid'] else '❌'}")
-                    st.markdown(f"  Explanation: _{result['explanation']}_")
-                else:
-                    st.markdown(f"- ❌ Error validating: {item}")
-
-    # col1, col2 = st.columns([2, 1])
-    # with col1:
-    #     st.markdown(f"### {section_name}")
-    # with col2:
-    #     if st.button("Validate", key=f"validate_{key_prefix}"):
-    #         st.session_state[f"show_section_trace_{key_prefix}"] = True
-
-    # if st.session_state.get(f"show_section_trace_{key_prefix}", True):
-    #     # if st.button("Close", key=f"close_section_{key_prefix}"):
-    #     #     st.session_state[f"show_section_trace_{key_prefix}"] = False
-    #     #     return 
-    #     with st.expander(f"Validation Report for {section_name}", expanded=True):
-    #         for item in items:
-    #             response = requests.post(
-    #                 API_URL + "/validate",
-    #                 json={
-    #                     "simplified_text": item,
-    #                     "original_text": original_text
-    #                 }
-    #             )
-    #             if response.status_code == 200:
-    #                 result = response.json()
-    #                 st.markdown(f"- **{item}**")
-    #                 st.markdown(f"  Match Found: {'✅' if result['is_valid'] else '❌'}")
-    #                 st.markdown(f"  Explanation: _{result['explanation']}_")
-    #             else:
-    #                 st.markdown(f"- ❌ Error validating: {item}")
-
-           
-
-# ————— Main area for output —————
-st.header("Simplified Output")
-
-has_content = False
-
-# Simplified Instructions
-if st.session_state["instructions"]:
-    has_content = True
-    col1, col2 = st.columns([5, 1])
-    with col1:
-        st.subheader("Instructions")
-    with col2:
-        if st.button("Validate All Instructions"):
-            validate_section(st.session_state["instructions"], idx=0, original_text=text_input or file_content)
-    for s in st.session_state["instructions"]:
-        st.markdown(f"- {s}")
-
-# Importance
-if st.session_state["importance"]:
-    has_content = True
-    col1, col2 = st.columns([5, 1])
-    with col1:
-        st.subheader("Importance")
-    with col2:
-        if st.button("Validate All Importance"):
-            validate_section(st.session_state["importance"], idx=1, original_text=text_input or file_content)
-
-    # for idx, imp in enumerate(st.session_state["importance"]):
-    #     validate(idx, imp, "importance")
-    for imp in st.session_state["importance"]:
-        st.markdown(f"- {imp}")
-
-# Follow‑Up Tasks
-if st.session_state["follow_up"]:
-    has_content = True
-    col1, col2 = st.columns([5, 1])
-    with col1:
-        st.subheader("Follow‑Up Appointments or Tasks")
-    with col2:
-        if st.button("Validate All Follow-Up"):
-            validate_section(st.session_state["follow_up"], idx=2, original_text=text_input or file_content)
-    # for idx, imp in enumerate(st.session_state["follow_up"]):
-    #     validate(idx, imp, "follow_up")
-    for f in st.session_state["follow_up"]:
-        st.markdown(f"- {f}")
-
-# Medications
-if st.session_state["medications"]:
-    has_content = True
-    col1, col2 = st.columns([5, 1])
-    with col1:
-        st.subheader("Medications")
-    with col2:
-        if st.button("Validate All Medications"):
-            validate_section(st.session_state["medications"], idx=3, original_text=text_input or file_content)
-    
-    # for idx, imp in enumerate(st.session_state["medications"]):
-    #     validate(idx, imp, "medications")
-    for m in st.session_state["medications"]:
-        st.markdown(f"- {m}")
-
-# Precautions
-if st.session_state["precautions"]:
-    has_content = True
-    col1, col2 = st.columns([5, 1])
-    with col1:
-        st.subheader("Precautions")
-    with col2:
-        if st.button("Validate All Precautions"):
-            validate_section(st.session_state["precautions"], idx=3, original_text=text_input or file_content)
-    # for idx, imp in enumerate(st.session_state["precautions"]):
-    #     validate(idx, imp, "precautions")
-    for p in st.session_state["precautions"]:
-        st.markdown(f"- {p}")
-
-# References
-if st.session_state["references"]:
-    has_content = True
-    col1, col2 = st.columns([5, 1])
-    with col1:
-        st.subheader("References")
-    with col2:
-        if st.button("Validate All References"):
-            validate_section(st.session_state["references"], idx=3, original_text=text_input or file_content)
-    
-    # for idx, imp in enumerate(st.session_state["references"]):
-    #     validate(idx, imp, "references")
-    for r in st.session_state["references"]:
-        st.markdown(f"- {r}")
-
-if not has_content:
-    st.info("Your simplified output will appear here.")
+                resp.raise_for_status()
+                reply = resp.json().get("reply", "")
+                st.session_state["chat_history"].append((q, reply))
+            except Exception as e:
+                st.error(f"Chat error: {e}")
+    for ques, ans in st.session_state.get("chat_history", []):
+        st.markdown(f"**You:** {ques}")
+        st.markdown(f"**Assistant:** {ans}")
