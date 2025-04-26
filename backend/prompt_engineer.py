@@ -6,6 +6,7 @@ from dotenv import load_dotenv, find_dotenv
 from ratelimit import limits, sleep_and_retry
 from openai import RateLimitError
 from utils import extract_json
+from validation_layer import chunk_text, build_faiss_index, validate_and_filter_fields
 
 # ─── Load environment ─────────────────────────────────────────────────────────
 load_dotenv(find_dotenv(), override=True)
@@ -65,6 +66,12 @@ def simplify_instructions(text: str, language: str = "English"):
 
     try:
         obj = extract_json(raw)
+        original_chunks = chunk_text(raw)
+        faiss_index, chunk_list = build_faiss_index(original_chunks)
+        validated_output = validate_and_filter_fields(obj, chunk_list, faiss_index)
+        print("LLM JSON →", validated_output , obj)
+        validate_obj = validated_output
+
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON from LLM: {e}\nRaw output:\n{raw}")
 
