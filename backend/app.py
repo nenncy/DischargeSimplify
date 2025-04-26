@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from openai import AsyncOpenAI
+from fastapi.responses import StreamingResponse
 from models import (
     UploadResponse,
     SimplifyRequest,
@@ -15,7 +16,7 @@ from models import (
     validateResponse,
 )
 from utils import save_file_locally, extract_text_from_file
-from prompt_engineer import simplify_instructions, validate_instructions
+from prompt_engineer import simplify_instructions, validate_instructions, build_simplify_prompt
 
 # Load environment
 load_dotenv()
@@ -63,6 +64,24 @@ def simplify(req: SimplifyRequest):
         "disclaimer":   disclaimer,
     }
 
+@app.post("/simplify_stream")
+async def simplify_stream(req: SimplifyRequest):
+    prompt = build_simplify_prompt(req.raw_text, req.language)
+
+    response = openai.chat.completions.create(
+        model="gpt-4o",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
+        stream=True,
+    )
+
+    async def event_generator():
+        for chunk in response:
+            delta = chunk.choices[0].delta.get("content")
+            if delta:
+                yield delta
+
+    return StreamingResponse(event_generator(), media_type="text/plain")
 
 @app.post("/assistant/chat", response_model=ChatResponse)
 async def assistant_chat(req: ChatRequest):

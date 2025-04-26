@@ -36,17 +36,16 @@ def _call_openai(prompt: str, model: str = "gpt-4o", temperature: float = 0.7):
         )
 
 
-def simplify_instructions(text: str, language: str = "English"):
+def build_simplify_prompt(text: str, language: str = "English") -> str:
     """
-    Translate & simplify discharge instructions into patient-friendly language.
-    Returns: summary, instructions, importance, follow_up_tasks, medications, precautions, references, disclaimer
+    Assemble the prompt for simplifying instructions.
     """
-    prompt = (
+    return (
         "You are a helpful medical assistant that translates and simplifies discharge instructions.\n"
-        f"First, translate **every word** of the following discharge instructions fully into {language}, making sure **no English remains**. "
+        f"First, translate every word of the following discharge instructions fully into {language}, making sure no English remains. "
         "Then, simplify that translated text into clear, patient-friendly language at approximately a 6th-grade reading level.\n\n"
         "IMPORTANT MEDICAL DISCLAIMER: Only simplify existing information; do not add new medical advice.\n"
-        "Do not invent medications — only mention those explicitly stated. Each bullet point max 20 words.\n\n"
+        "Do not invent medications—only mention those explicitly stated. Each bullet point max 20 words.\n\n"
         "Output only a valid JSON object with keys:\n"
         "  \"Summary\": 2-3 sentence overview.\n"
         "  \"SimplifiedInstructions\": array of bullet-point instructions.\n"
@@ -60,22 +59,23 @@ def simplify_instructions(text: str, language: str = "English"):
         f"{text}\n"
     )
 
+
+def simplify_instructions(text: str, language: str = "English"):
+    """
+    Translate & simplify discharge instructions into patient-friendly language.
+    Returns: summary, instructions, importance, follow_up_tasks, medications, precautions, references, disclaimer
+    """
+    prompt = build_simplify_prompt(text, language)
     resp = _call_openai(prompt)
     raw = getattr(resp.choices[0], "message", resp.choices[0]).content
     print("LLM RAW JSON →", raw)
 
     try:
         obj = extract_json(raw)
-        original_chunks = chunk_text(raw)
-        faiss_index, chunk_list = build_faiss_index(original_chunks)
-        validated_output = validate_and_filter_fields(obj, chunk_list, faiss_index)
-        print("LLM JSON →", validated_output , obj)
-        validate_obj = validated_output
-
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON from LLM: {e}\nRaw output:\n{raw}")
 
-    # Return raw parsed JSON fields (no FAISS filtering here)
+    # Skip FAISS here; return full raw JSON
     return (
         obj.get("Summary", ""),
         obj.get("SimplifiedInstructions", []),
@@ -86,6 +86,7 @@ def simplify_instructions(text: str, language: str = "English"):
         obj.get("References", []),
         obj.get("Disclaimer", "")
     )
+
 
 
 def validate_instructions(original_text: str, simplified_text: str):
