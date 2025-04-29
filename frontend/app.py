@@ -17,6 +17,17 @@ VALIDATE_URL = f"{BASE_URL}/validate"
 # ─── Full language list ─────────────────────────────────────────────────────────
 languages = sorted([lang.name for lang in pycountry.languages if hasattr(lang, "alpha_2")])
 
+
+
+# ─── Streamlit components ────────────────────────────────────────────────────
+@st.dialog("View Original Content")
+def open_content(text_input: str, file_content: str):
+     st.markdown("### Original Content")
+     if text_input:
+         st.markdown(f"**Text Input:**\n{text_input}")
+     if file_content:
+         st.markdown(f"**File Content:**\n{file_content}")
+         
 # ─── Session state init ───────────────────────────────────────────────────────
 if "raw_text" not in st.session_state:
     st.session_state.update({
@@ -44,7 +55,7 @@ def do_simplify():
         res = requests.post(
             SIMPLIFY_URL,
             json={"raw_text": txt, "language": lang},
-            timeout=120
+            timeout=60
         )
         res.raise_for_status()
         d = res.json()
@@ -96,15 +107,11 @@ with st.sidebar:
             content = uploaded.read().decode("utf-8")
             st.session_state["raw_text"] = content
             st.session_state["file_content"] = content
-
+    
+    if st.button("View Original Content"):
+         open_content(st.session_state["raw_text"], st.session_state["file_content"])
     if st.button("Simplify"):
         do_simplify()
-
-    if st.button("View Original Content"):
-        with st.expander("Original Content", expanded=True):
-            st.markdown(f"**Text Input:**\n{st.session_state['raw_text']}")
-            if st.session_state.get("file_content"):
-                st.markdown(f"**File Content:**\n{st.session_state['file_content']}")
 
 # ─── Main: Simplified Output ──────────────────────────────────────────────────
 st.header("Simplified Output")
@@ -112,12 +119,24 @@ if st.session_state.get("summary"):
     st.subheader("Summary")
     st.write(st.session_state["summary"])
 
-# Validation helper
 VALIDATE = lambda item: requests.post(
     VALIDATE_URL,
     json={"simplified_text": item, "original_text": st.session_state["raw_text"]},
     timeout=30
 )
+
+
+@st.dialog("Validate All")
+def validate_all(items, key):
+    for item in items:
+        res = VALIDATE(item)
+        if res.status_code == 200:
+            r = res.json()
+            st.markdown(f"- **{item}**")
+            st.markdown(f"  Match Found: {'✅' if r.get('is_valid') else '❌'}")
+            st.markdown(f"  Explanation: _{r.get('explanation','')}_")
+        else:
+            st.markdown(f"- ❌ Error validating: {item}")
 
 def display_section(title, items, key):
     if not items:
@@ -127,20 +146,11 @@ def display_section(title, items, key):
         st.subheader(title)
     with col2:
         if st.button("Validate All", key=f"validate_{key}"):
-            with st.expander("Validation Report", expanded=True):
-                for item in items:
-                    res = VALIDATE(item)
-                    if res.status_code == 200:
-                        r = res.json()
-                        st.markdown(f"- **{item}**")
-                        st.markdown(f"  Match Found: {'✅' if r.get('is_valid') else '❌'}")
-                        st.markdown(f"  Explanation: _{r.get('explanation','')}_")
-                    else:
-                        st.markdown(f"- ❌ Error validating: {item}")
+            validate_all(items, key)
     for itm in items:
         st.markdown(f"- {itm}")
 
-# Sections
+
 display_section("Instructions", st.session_state["instructions"], "instructions")
 display_section("Importance", st.session_state["importance"], "importance")
 display_section("Follow-Up Tasks", st.session_state["follow_up"], "follow_up")
