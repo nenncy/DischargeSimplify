@@ -32,6 +32,8 @@ This project uses **Large Language Models (LLMs)** to **translate clinical disch
 - **Validation Layer**  
   Post-processes AI output to ensure it meets accuracy and safety standards before usage.
 
+- **Assistant Chat**
+  Assistant chat works with the user to ask follow-up questions froma  simplified version.
 ---
 
 ## ⚙️ Tech Stack
@@ -40,7 +42,7 @@ This project uses **Large Language Models (LLMs)** to **translate clinical disch
 |:-------------------------- |:------------------------------- |
 | Backend Framework         | FastAPI                         |
 | AI Model Interface         | Huggingface Transformers, SentenceTransformers |
-| Database (optional/future) | PostgreSQL (planned for user management) |
+| Database (optional/future) | SQL                             |
 | Retrieval/Indexing Layer   | FAISS for semantic search       |
 | Frontend (optional/future) | Streamlit     |
 | Language Models Used       | Local or OpenAI APIs (configurable) |
@@ -88,6 +90,7 @@ Visit `http://127.0.0.1:8000/docs` for API documentation.
 |:-------|:------------------------------|:------------------------------------- |
 | POST   | `/simplify`       | Simplify discharge instructions       |
 | POST   | `/validate`       | Validate the simplified output        |
+| POST   | `/assistant/chat`           | Assistant chat from the simplified output |
 
 (Interactive Swagger documentation auto-generated at `/docs`.)
 
