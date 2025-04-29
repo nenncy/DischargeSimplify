@@ -27,7 +27,7 @@ class FhirRequest(BaseModel):
     precautions: List[str]
     references: List[str]
     disclaimer: str
-    patient_id: str
+    patient_id: Optional[str] = None
     author_reference: Optional[str] = None
 
 class SimplifyResponse(BaseModel):

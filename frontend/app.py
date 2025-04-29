@@ -75,21 +75,25 @@ def do_simplify():
             "fhir_composition_str": None, 
         })
          # ── AUTOMATIC FHIR CONVERSION ────────────────────────────────────
-        if st.session_state.patient_id:
-            payload = { k: st.session_state[k] for k in [
+        payload = { 
+            k: st.session_state[k] for k in [
                 "summary","instructions","importance",
                 "follow_up","medications","precautions","references","disclaimer"
-            ] }
-            payload["patient_id"] = st.session_state.patient_id
-            payload["author_reference"] = FHIR_AUTHOR_REF
-            try:
-                to_fhir_resp = requests.post(TOFHIR_URL, json=payload, timeout=60)
-                to_fhir_resp.raise_for_status()
-                st.session_state.fhir_composition_str = json.dumps(
-                    to_fhir_resp.json(), indent=2
-                )
-            except Exception as fhir_e:
-                st.error(f"{'FHIR conversion failed'}: {fhir_e}")
+            ] 
+        }
+        # Handle patient_id with trim and null conversion
+        patient_id = st.session_state.patient_id.strip()
+        payload["patient_id"] = patient_id if patient_id else None
+        payload["author_reference"] = FHIR_AUTHOR_REF
+        
+        try:
+            to_fhir_resp = requests.post(TOFHIR_URL, json=payload, timeout=60)
+            to_fhir_resp.raise_for_status()
+            st.session_state.fhir_composition_str = json.dumps(
+                to_fhir_resp.json(), indent=2
+            )
+        except Exception as fhir_e:
+            st.error(f"{'FHIR conversion failed'}: {fhir_e}")
         # ────────────────────────────────────────────────────────────────────
     except Exception as e:
         st.error(f"Simplify error: {e}")
@@ -111,10 +115,10 @@ with col2:
 with st.sidebar:
     st.header("Discharge Instructions Input")
     st.text_input(
-        "Patient ID",
+        "Patient ID (optional)",
         value=st.session_state.get("patient_id", ""),
         key="patient_id",
-        help="Enter the FHIR Patient resource ID to reference in the Composition"
+        help="Optional FHIR Patient resource ID for Composition reference"
     )
     method = st.radio("Input method:", ("Enter text", "Upload file"))
     if method == "Enter text":

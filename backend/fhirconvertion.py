@@ -36,12 +36,14 @@ def convert_to_composition(data: dict, patient_id: str, author_reference: Option
                 "display": "Discharge summary"
             }]
         },
-        "subject": [ { "reference": f"Patient/{patient_id}" } ],
         "date": datetime.now().astimezone().isoformat(),
         "author": [ { "reference": ref } ],
         "title": "Discharge Summary",
         "section": []
     }
+    # Add subject only if patient_id is provided
+    if patient_id is not None:
+        comp_dict["subject"] = [{"reference": f"Patient/{patient_id}"}]
 
     # Summary section (note lowercase key)
     summary_text = data.get("Summary") or data.get("summary") or ""
@@ -100,8 +102,9 @@ def main():
     )
     parser.add_argument(
         "--patient-id", 
-        required=True,
-        help="FHIR Patient ID to reference in the Composition"
+        required=False,
+        default=None,
+        help="Optional FHIR Patient ID to reference in the Composition"
     )
     parser.add_argument(
         "--output-file", 
