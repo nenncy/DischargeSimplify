@@ -14,9 +14,12 @@ from models import (
     ChatResponse,
     validateRequest,
     validateResponse,
+    FhirRequest
 )
 from utils import save_file_locally, extract_text_from_file
 from prompt_engineer import simplify_instructions, validate_instructions, build_simplify_prompt
+from fastapi.encoders import jsonable_encoder
+from fhirconvertion import convert_to_composition
 
 # Load environment
 load_dotenv()
@@ -140,6 +143,24 @@ def validate(req: validateRequest):
         "simplified_text": simplified_text,
     }
 
+@app.post("/to_fhir")
+async def to_fhir(payload: FhirRequest):
+    try:
+        data = payload.dict(exclude={"patient_id", "author_reference"})
+        comp = convert_to_composition(
+            data,
+            patient_id=payload.patient_id,
+            author_reference=payload.author_reference,
+        )
+        fhir_json = jsonable_encoder(comp, exclude_none=True)
+        import json
+        print("FHIR Composition JSON → ```json")
+        print(json.dumps(fhir_json, indent=2))
+        print("```")
+        return fhir_json
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))   
 
 @app.get("/health")
 def health_check():

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 class UploadResponse(BaseModel):
     file_path: str
@@ -18,6 +18,17 @@ class validateResponse(BaseModel):
     is_valid: bool
     explanation: str
 
+class FhirRequest(BaseModel):
+    summary: str
+    instructions: List[str]
+    importance: List[str]
+    follow_up: List[str]
+    medications: List[str]
+    precautions: List[str]
+    references: List[str]
+    disclaimer: str
+    patient_id: str
+    author_reference: Optional[str] = None
 
 class SimplifyResponse(BaseModel):
     summary: str

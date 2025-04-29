@@ -1,6 +1,7 @@
 import os
 import requests
 import pycountry
+import json
 import streamlit as st
 from dotenv import load_dotenv, find_dotenv
 
@@ -13,11 +14,11 @@ BASE_URL     = os.getenv("BACKEND_URL", "http://localhost:8000")
 SIMPLIFY_URL = f"{BASE_URL}/simplify"
 CHAT_URL     = f"{BASE_URL}/assistant/chat"
 VALIDATE_URL = f"{BASE_URL}/validate"
+TOFHIR_URL = os.getenv("BACKEND_URL", "http://localhost:8000") + "/to_fhir"
+FHIR_AUTHOR_REF = os.getenv("FHIR_AUTHOR_REF", "Device/DischargeSimplify")
 
 # ─── Full language list ─────────────────────────────────────────────────────────
 languages = sorted([lang.name for lang in pycountry.languages if hasattr(lang, "alpha_2")])
-
-
 
 # ─── Streamlit components ────────────────────────────────────────────────────
 @st.dialog("View Original Content")
@@ -42,7 +43,9 @@ if "raw_text" not in st.session_state:
         "references":        [],
         "disclaimer":        "",
         "chat_history":      [],
-        "selected_language": "English"
+        "selected_language": "English",
+        "patient_id": "", 
+        "fhir_composition_str": None, 
     })
 
 # ─── Simplify function ────────────────────────────────────────────────────────
@@ -68,8 +71,26 @@ def do_simplify():
             "precautions":  d.get("precautions", []),
             "references":   d.get("references", []),
             "disclaimer":   d.get("disclaimer", ""),
-            "chat_history": []
+            "chat_history": [],
+            "fhir_composition_str": None, 
         })
+         # ── AUTOMATIC FHIR CONVERSION ────────────────────────────────────
+        if st.session_state.patient_id:
+            payload = { k: st.session_state[k] for k in [
+                "summary","instructions","importance",
+                "follow_up","medications","precautions","references","disclaimer"
+            ] }
+            payload["patient_id"] = st.session_state.patient_id
+            payload["author_reference"] = FHIR_AUTHOR_REF
+            try:
+                to_fhir_resp = requests.post(TOFHIR_URL, json=payload, timeout=60)
+                to_fhir_resp.raise_for_status()
+                st.session_state.fhir_composition_str = json.dumps(
+                    to_fhir_resp.json(), indent=2
+                )
+            except Exception as fhir_e:
+                st.error(f"{'FHIR conversion failed'}: {fhir_e}")
+        # ────────────────────────────────────────────────────────────────────
     except Exception as e:
         st.error(f"Simplify error: {e}")
 
@@ -79,7 +100,7 @@ col1.title("Discharge Instructions Simplifier & Assistant")
 with col2:
     st.markdown("**Language**")
     st.selectbox(
-        "",
+        label="Select language:",
         options=languages,
         key="selected_language",
         on_change=do_simplify,
@@ -89,6 +110,12 @@ with col2:
 # ─── Sidebar: Input & Controls ─────────────────────────────────────────────────
 with st.sidebar:
     st.header("Discharge Instructions Input")
+    st.text_input(
+        "Patient ID",
+        value=st.session_state.get("patient_id", ""),
+        key="patient_id",
+        help="Enter the FHIR Patient resource ID to reference in the Composition"
+    )
     method = st.radio("Input method:", ("Enter text", "Upload file"))
     if method == "Enter text":
         st.text_area(
