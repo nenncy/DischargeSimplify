@@ -42,7 +42,7 @@ This project uses **Large Language Models (LLMs)** to **translate clinical disch
 | AI Model Interface         | Huggingface Transformers, SentenceTransformers |
 | Database (optional/future) | PostgreSQL (planned for user management) |
 | Retrieval/Indexing Layer   | FAISS for semantic search       |
-| Frontend (optional/future) | Streamlit / React (planned)     |
+| Frontend (optional/future) | Streamlit     |
 | Language Models Used       | Local or OpenAI APIs (configurable) |
 
 ---
@@ -86,8 +86,8 @@ Visit `http://127.0.0.1:8000/docs` for API documentation.
 
 | Method | Endpoint                     | Purpose                               |
 |:-------|:------------------------------|:------------------------------------- |
-| POST   | `/simplify_instructions`       | Simplify discharge instructions       |
-| POST   | `/validate_instructions`       | Validate the simplified output        |
+| POST   | `/simplify`       | Simplify discharge instructions       |
+| POST   | `/validate`       | Validate the simplified output        |
 
 (Interactive Swagger documentation auto-generated at `/docs`.)
 
