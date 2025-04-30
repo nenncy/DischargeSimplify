@@ -2,7 +2,7 @@ import os
 import asyncio
 import openai
 from dotenv import load_dotenv
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from openai import AsyncOpenAI
 from fastapi.responses import StreamingResponse
@@ -14,14 +14,23 @@ from models import (
     ChatResponse,
     validateRequest,
     validateResponse,
-)
+    InstructionVersion,
+    InstructionVersionCreate,
+    InstructionVersionResponse
+    )
+from db import get_engine
 from utils import save_file_locally, extract_text_from_file
 from prompt_engineer import simplify_instructions, validate_instructions, build_simplify_prompt
+from sqlalchemy.orm import Session
+from sqlalchemy.orm import sessionmaker, declarative_base
 
 # Load environment
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 ASSISTANT_ID = os.getenv("ASSISTANT_ID")
+
+
+
 
 # Initialize FastAPI
 app = FastAPI()
@@ -31,6 +40,35 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+engine  =  get_engine()
+
+# ─── Database connection ────────────────────────────────────────────────────
+with engine.connect() as conn:
+    if conn:
+        print("Connection successful")
+    else:
+        print("Connection failed")
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# Dependency to get DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+# # ─── Database models ──────────────────────────────────────────────────────
+# @app.get("/discharge_simplify/", response_model=list[InstructionVersionResponse])
+# def get_all_instructions(db: Session = Depends(get_db)):
+#     instructions = db.query(InstructionVersion).all()
+#     print(instructions,"***")
+#     return instructions
+
 
 # Async client for assistant chat
 client = AsyncOpenAI(api_key=openai.api_key)
