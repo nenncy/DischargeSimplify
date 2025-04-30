@@ -59,16 +59,18 @@ def do_simplify():
     lang = st.session_state["selected_language"]
     if not txt:
         return
-    try:
-        res = requests.post(
+    with st.spinner("Simplifying..."):
+        try:
+       
+            res = requests.post(
             SIMPLIFY_URL,
             json={"raw_text": txt, "language": lang},
             timeout=60
         )
-        res.raise_for_status()
-        d = res.json()
+            res.raise_for_status()
+            d = res.json()
         # print("🔍 Simplify response:", d)
-        st.session_state.update({
+            st.session_state.update({
             "summary":      d.get("summary", ""),
             "instructions": d.get("instructions", []),
             "importance":   d.get("importance", []),
@@ -78,9 +80,9 @@ def do_simplify():
             "references":   d.get("references", []),
             "disclaimer":   d.get("disclaimer", ""),
             "chat_history": []
-        })
-    except Exception as e:
-        st.error(f"Simplify error: {e}")
+         })
+        except Exception as e:
+            st.error(f"Simplify error: {e}")
 
 # ─── Header & language selector ────────────────────────────────────────────────
 col1, col2 = st.columns([3, 1])
@@ -150,25 +152,57 @@ def validate_all(items, key):
         else:
             st.markdown(f"- ❌ Error validating: {item}")
 
-def display_section(title, items, key):
+# def display_section(title, items, key):
+#     if not items:
+#         return
+#     col1, col2 = st.columns([5, 1])
+#     with col1:
+#         st.subheader(title)
+#     with col2:
+#         if st.button("Validate All", key=f"validate_{key}"):
+#             validate_all(items, key)
+#     for itm in items:
+#         st.markdown(f"- {itm}")
+
+def display_section(title, items, key, color="#f8f6ff"):
     if not items:
         return
-    col1, col2 = st.columns([5, 1])
-    with col1:
-        st.subheader(title)
-    with col2:
-        if st.button("Validate All", key=f"validate_{key}"):
-            validate_all(items, key)
-    for itm in items:
-        st.markdown(f"- {itm}")
+
+    # Handle button logic first (so it works)
+    validate_clicked = st.button("Validate All", key=f"validate_{key}")
+
+    # Build HTML list
+    item_html = "".join(f"<li>{itm}</li>" for itm in items)
+
+    # Render full section with title + button inline using flexbox
+    st.markdown(f"""
+    <div style="
+        background-color: {color};
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        box-shadow: 0px 2px 8px rgba(0,0,0,0.08);
+    ">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h4 style="margin: 0;">{title}</h4>
+        </div>
+        <ul style="padding-left: 20px; margin-top: 10px;">
+            {item_html}
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Manually check if button was clicked
+    if validate_clicked:
+        validate_all(items, key)
 
 
 
-# ─── Render cards ────────────────────────────────────────────────────────────
-def render_cards(title: str, emoji: str, content, color: str, is_list: bool = False):
+def render_cards(title: str, emoji: str, content, color: str, is_list: bool = False , key: str = None):
     if not content:
         return
-
+    validate_clicked = st.button("Validate All", key=f"validate_{key}")
+    
     body = (
         "".join(f"<li>{item}</li>" for item in content)
         if is_list else f"<p>{content}</p>"
@@ -184,27 +218,46 @@ def render_cards(title: str, emoji: str, content, color: str, is_list: bool = Fa
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        min-height: 100%;  /* 👈 Dynamic fill */
+        max-height: 100%;  /* Dynamic fill */
     ">
         <h4 style="margin-bottom: 10px;">{emoji} {title}</h4>
         {'<ul style="padding-left: 20px;">' + body + '</ul>' if is_list else body}
     </div>
     """, unsafe_allow_html=True)
 
+    if validate_clicked:
+        validate_all(content, key)
+
 summary = st.session_state.get("summary", "")
 instructions = st.session_state.get("instructions", [])
 importance = st.session_state.get("importance", [])
+Followup=  st.session_state.get("follow_up", [])
+medications = st.session_state.get("medications", [])   
+precasutions = st.session_state.get("precautions", [])
+
 
 col1, col2, col3 = st.columns(3)
 with col1:
     with st.container():
-        render_cards("Summary", "🗒️", summary, "#f8f6ff", is_list=False)
+        render_cards("Summary", "🗒️", summary, "#f8f6ff", is_list=False , key = "summary")
 with col2:
     with st.container():
-        render_cards("Instructions", "📝", instructions, "#eef4ff", is_list=True)
+        render_cards("Instructions", "📝", instructions, "#eef4ff", is_list=True ,  key= "instruction" )
 with col3:
     with st.container():
-        render_cards("Importance", "⚠️", importance, "#fff5e6", is_list=True)
+        render_cards("Importance", "⚠️", importance, "#fff5e6", is_list=True , key= "importance")
+
+
+# col1, col2, col3 = st.columns(3)
+# with col1:
+#     with st.container():
+#         render_cards("Follow-Up Tasks", "🗒️", Followup, "#f8f6ff", is_list=True)
+# with col2:
+#     with st.container():
+#         render_cards("Medications", "📝", medications, "#eef4ff", is_list=True)
+# with col3:
+#     with st.container():
+#         render_cards("Precautions", "⚠️", precasutions, "#fff5e6", is_list=True)
 
 
 # display_section("Instructions", st.session_state["instructions"], "instructions")

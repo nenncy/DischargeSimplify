@@ -17,12 +17,12 @@ HEADERS = {
 # 3) Payload: minimal v1 schema
 payload = {
     "name":         "Discharge Helper",
-    "description":  "Answers follow-up questions STRICTLY from the user’s own simplified discharge instructions.",
-    "instructions": (
-        "You are the Discharge-Helper Assistant. You MUST answer questions *only* from the provided 'context' "
-        "of simplified instructions. If the answer is not in that context, reply “I’m sorry, I don’t have that information.”"
+    "description":  "Answers follow-up questions STRICTLY from the user’s own simplified discharge instructions but If the user greets you (e.g., says 'hi', 'hello', 'hey'), respond politely with a greeting and say 'How can I assist you today?'.",
+   "instructions": (
+    "You are the Discharge-Helper Assistant. You MUST answer questions *only* from the provided 'context' "
+    "of simplified instructions. If the answer is not in that context, reply “I’m sorry, I don’t have that information.” "
     ),
-    "model":        "gpt-3.5-turbo"
+    "model": "gpt-4o"
 }
 
 # 4) Create the assistant
