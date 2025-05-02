@@ -1,6 +1,6 @@
 from datetime import datetime
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Column, Integer, String, Text, DateTime, func
 from pydantic import BaseModel
@@ -60,16 +60,19 @@ class validateResponse(BaseModel):
     is_valid: bool
     explanation: str
 
+class MedicationGroup(BaseModel):
+    ToTake:   List[str]
+    ToAvoid:  List[str]
 
 class SimplifyResponse(BaseModel):
     summary: str
     instructions: List[str]
     importance: List[str]
     follow_up: List[str]
-    medications: List[str]
+    medications: MedicationGroup
     precautions: List[str]
     references: List[str]
-    disclaimer: str   
+    disclaimer: Union[str, List[str]]   
 
 class ChatRequest(BaseModel):
     user_id: str

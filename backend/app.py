@@ -17,20 +17,23 @@ from models import (
     InstructionVersion,
     InstructionVersionCreate,
     InstructionVersionResponse
-    )
-from db import get_engine
+)
+from db import get_conn
 from utils import save_file_locally, extract_text_from_file
 from prompt_engineer import simplify_instructions, validate_instructions, build_simplify_prompt
-from sqlalchemy.orm import Session
-from sqlalchemy.orm import sessionmaker, declarative_base
 
 # Load environment
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 ASSISTANT_ID = os.getenv("ASSISTANT_ID")
 
-
-
+# Simple psycopg2 connection dependency
+def get_db_conn():
+    conn = get_conn()
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 # Initialize FastAPI
 app = FastAPI()
@@ -40,35 +43,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-engine  =  get_engine()
-
-# ─── Database connection ────────────────────────────────────────────────────
-with engine.connect() as conn:
-    if conn:
-        print("Connection successful")
-    else:
-        print("Connection failed")
-
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
-
-# Dependency to get DB session
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-# # ─── Database models ──────────────────────────────────────────────────────
-# @app.get("/discharge_simplify/", response_model=list[InstructionVersionResponse])
-# def get_all_instructions(db: Session = Depends(get_db)):
-#     instructions = db.query(InstructionVersion).all()
-#     print(instructions,"***")
-#     return instructions
-
 
 # Async client for assistant chat
 client = AsyncOpenAI(api_key=openai.api_key)
@@ -102,10 +76,10 @@ def simplify(req: SimplifyRequest):
         "disclaimer":   disclaimer,
     }
 
+
 @app.post("/simplify_stream")
 async def simplify_stream(req: SimplifyRequest):
     prompt = build_simplify_prompt(req.raw_text, req.language)
-
     response = openai.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": prompt}],
@@ -120,6 +94,7 @@ async def simplify_stream(req: SimplifyRequest):
                 yield delta
 
     return StreamingResponse(event_generator(), media_type="text/plain")
+
 
 @app.post("/assistant/chat", response_model=ChatResponse)
 async def assistant_chat(req: ChatRequest):
@@ -171,10 +146,9 @@ def validate(req: validateRequest):
         req.original_text,
         req.simplified_text
     )
-    # You can log or manipulate ans if needed
     return {
-        "is_valid":      is_valid,
-        "explanation":   explanation,
+        "is_valid":        is_valid,
+        "explanation":     explanation,
         "simplified_text": simplified_text,
     }
 
