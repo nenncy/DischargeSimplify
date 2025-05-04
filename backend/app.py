@@ -21,15 +21,6 @@ load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 ASSISTANT_ID = os.getenv("ASSISTANT_ID")
 
-# # Simple psycopg2 connection dependency
-# def get_db_conn():
-#     conn = get_conn()
-#     try:
-#         yield conn
-#     finally:
-#         conn.close()
-
-
 
 # Dependency to get DB session
 def get_db():
@@ -113,7 +104,13 @@ async def simplify_stream(req: SimplifyRequest):
 @app.post("/assistant/chat", response_model=ChatResponse)
 async def assistant_chat(req: ChatRequest):
     # 1) create thread
+    msg = req.user_message.strip().lower()
+    if msg in {"hi", "hello", "hey", "good morning", "good afternoon", "good evening"}:
+        return ChatResponse(reply="👋 Hello! I’m your Discharge-Helper Assistant. How can I help you today?")
+    if msg in {"thanks", "thank you", "thx", "ty"}:
+        return ChatResponse(reply="You’re very welcome! Let me know if there’s anything else I can do.")
     thread = await client.beta.threads.create()
+    
 
     # 2) post context+question as a single user message
     combined = (

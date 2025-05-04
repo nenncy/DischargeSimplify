@@ -7,7 +7,8 @@ from dotenv import load_dotenv, find_dotenv
 # ─── Load .env & set API key ────────────────────────────────────────────────────
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
-print("🔑 Using key", openai.api_key)
+print("🔑 Using OPENAI_API_KEY=", os.getenv("OPENAI_API_KEY"))
+
 
 # ─── Language mappings ──────────────────────────────────────────────────────────
 LANGUAGE_MAPPING = {lang.name: lang.alpha_2 for lang in pycountry.languages if hasattr(lang, 'alpha_2')}
