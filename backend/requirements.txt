@@ -1,0 +1,17 @@
+fastapi
+uvicorn[standard]
+pydantic
+boto3
+pdfminer.six
+openai
+python-multipart
+python-dotenv
+httpx<0.24
+psycopg2
+requests
+fhir
+fhir.resources
+sqlalchemy
+ratelimit
+sentence_transformers
+faiss-cpu
