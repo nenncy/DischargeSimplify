@@ -107,8 +107,8 @@ async def assistant_chat(req: ChatRequest):
     if msg in {"hi", "hello", "hey", "good morning", "good afternoon", "good evening"}:
         return ChatResponse(reply="👋 Hello! I’m your Discharge-Helper Assistant. How can I help you today?")
     if msg in {"thanks", "thank you", "thx", "ty"}:
-        return ChatResponse(reply="You’re very welcome! Let me know if there’s anything else I can do.")
-    
+        return ChatResponse(reply="You’re very welcome! Let me know if there’s anything else I can do.")
+
     # 1) create thread
     thread = await client.beta.threads.create()
     

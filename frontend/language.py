@@ -5,7 +5,8 @@ import streamlit as st
 from dotenv import load_dotenv, find_dotenv
 
 # ─── Load .env & set API key ────────────────────────────────────────────────────
-load_dotenv()
+load_dotenv(find_dotenv(), override=True)
+print("🔑 Using OPENAI_API_KEY=", os.getenv("OPENAI_API_KEY"))
 openai.api_key = os.getenv("OPENAI_API_KEY")
 print("🔑 Using OPENAI_API_KEY=", os.getenv("OPENAI_API_KEY"))
 
