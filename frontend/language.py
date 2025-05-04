@@ -5,8 +5,9 @@ import streamlit as st
 from dotenv import load_dotenv, find_dotenv
 
 # ─── Load .env & set API key ────────────────────────────────────────────────────
-load_dotenv(find_dotenv(), override=True)
+load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
+print("🔑 Using key", openai.api_key)
 
 # ─── Language mappings ──────────────────────────────────────────────────────────
 LANGUAGE_MAPPING = {lang.name: lang.alpha_2 for lang in pycountry.languages if hasattr(lang, 'alpha_2')}

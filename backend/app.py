@@ -11,23 +11,50 @@ from fastapi.encoders import jsonable_encoder
 from models import (UploadResponse,SimplifyRequest,SimplifyResponse,ChatRequest,ChatResponse,validateRequest,validateResponse,FhirRequest, InstructionVersion, InstructionVersionCreate, InstructionVersionResponse)
 from utils import save_file_locally, extract_text_from_file
 from prompt_engineer import simplify_instructions, validate_instructions, build_simplify_prompt
-from db import get_conn
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from db import SessionLocal
+from models import InstructionVersion, InstructionVersionCreate, InstructionVersionResponse
 
 # Load environment
 load_dotenv()
 openai.api_key = os.getenv("OPENAI_API_KEY")
 ASSISTANT_ID = os.getenv("ASSISTANT_ID")
 
-# Simple psycopg2 connection dependency
-def get_db_conn():
-    conn = get_conn()
+# # Simple psycopg2 connection dependency
+# def get_db_conn():
+#     conn = get_conn()
+#     try:
+#         yield conn
+#     finally:
+#         conn.close()
+
+
+
+# Dependency to get DB session
+def get_db():
+    db = SessionLocal()
     try:
-        yield conn
+        yield db
     finally:
-        conn.close()
+        db.close()
+
+app = FastAPI()
+@app.post("/discharge_instructions/", response_model=InstructionVersionResponse)
+def create_instruction(instruction: InstructionVersionCreate, db: Session = Depends(get_db)):
+    db_instruction = InstructionVersion(**instruction.dict())
+    db.add(db_instruction)
+    db.commit()
+    db.refresh(db_instruction)
+    return db_instruction
+
+@app.get("/discharge_simplify/", response_model=list[InstructionVersionResponse])
+def get_all_instructions(db: Session = Depends(get_db)):
+    instructions = db.query(InstructionVersion).all()
+    return instructions
+
 
 # Initialize FastAPI
-app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[os.getenv("FRONTEND_URL", "*")],

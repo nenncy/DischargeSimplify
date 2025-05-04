@@ -11,12 +11,14 @@ load_dotenv(find_dotenv(), override=True)
 st.set_page_config(page_title="Discharge Helper", layout="wide")
 
 # ─── Backend endpoints ─────────────────────────────────────────────────────────
-BASE_URL     = os.getenv("BACKEND_URL", "http://127.0.0.1:8001")
+BASE_URL     = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
 SIMPLIFY_URL = f"{BASE_URL}/simplify"
 CHAT_URL     = f"{BASE_URL}/assistant/chat"
 VALIDATE_URL = f"{BASE_URL}/validate"
-TOFHIR_URL   = os.getenv("BACKEND_URL", "http://127.0.0.1:8001") + "/to_fhir"
+TOFHIR_URL   = os.getenv("BACKEND_URL", "http://127.0.0.1:8000") + "/to_fhir"
 FHIR_AUTHOR_REF = os.getenv("FHIR_AUTHOR_REF", "Device/DischargeSimplify")
+SAVE_INSTRUCTION_URL = f"{BASE_URL}/discharge_instructions/"
+
 
 # ─── Session State Initialization ──────────────────────────────────────────────
 session_defaults = {
@@ -119,11 +121,41 @@ def validate_all(items, section_key=None):
             st.markdown(f"  {t('Match Found')}: {'✅' if r.get('is_valid') else '❌'}")
             explanation = r.get("explanation", "")
             st.markdown(f"  {t('Explanation')}: _{t(explanation)}_")
+
+         # --- Clinician Review Section ---
+            if st.session_state.get("clinician_review"):
+                st.markdown("**Clinician Review**")
+                review = st.radio(
+                    label="Approve this instruction?",
+                    options=["Pending", "Approve", "Reject"],
+                    key=f"review_{item}"
+                )
+                comment = st.text_area("Comment (optional)", key=f"comment_{item}")
+
+                if st.button("Submit Review", key=f"submit_{item}"):
+                    review_payload = {
+                        "instruction": item,
+                        "match_found": r.get("is_valid"),
+                        "explanation": explanation,
+                        "clinician_decision": review,
+                        "clinician_comment": comment
+                    }
+                    print("Review Payload:", review_payload)
+                    # POST to backend (example endpoint)
+                # try:
+                #     response = requests.post(f"{BASE_URL}/clinician_review", json=review_payload)
+                #     if response.status_code == 200:
+                #         st.success("Clinician review submitted.")
+                #     else:
+                #         st.error("Failed to submit review.")
+                # except Exception as e:
+                #     st.error(f"Error: {str(e)}")
         else:
             st.markdown(f"- ❌ {t('Error validating')}: {item}")
             
 # ─── Section renderers ───────────────────────────────────────────────────────      
 def display_section(title, items, key, color="#f8f6ff"):
+
     if not items:
         return
     if st.button(t("Validate All"), key=f"validate_{key}"):
@@ -219,6 +251,15 @@ with col2:
 # ─── Sidebar: Input & Controls ─────────────────────────────────────────────────
 with st.sidebar:
     st.header(t("Discharge Instructions Input"))
+    # Top of your app
+    st.sidebar.markdown("## Select Role")
+    role = st.sidebar.radio("You are viewing as:", ["User", "Clinician"])
+    if role == "Clinician":
+        st.sidebar.markdown("## Clinician Review")
+        st.session_state['clinician_review']= True
+    else:
+        st.session_state['clinician_review'] = False
+
     #st.text_input(
     #    t("Patient ID (optional)"),
     #    value=st.session_state.get("patient_id", ""),
