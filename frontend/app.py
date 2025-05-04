@@ -11,11 +11,11 @@ load_dotenv(find_dotenv(), override=True)
 st.set_page_config(page_title="Discharge Helper", layout="wide")
 
 # ─── Backend endpoints ─────────────────────────────────────────────────────────
-BASE_URL     = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
+BASE_URL     = os.getenv("BACKEND_URL", "http://127.0.0.1:8001")
 SIMPLIFY_URL = f"{BASE_URL}/simplify"
 CHAT_URL     = f"{BASE_URL}/assistant/chat"
 VALIDATE_URL = f"{BASE_URL}/validate"
-TOFHIR_URL   = os.getenv("BACKEND_URL", "http://127.0.0.1:8000") + "/to_fhir"
+TOFHIR_URL   = os.getenv("BACKEND_URL", "http://127.0.0.1:8001") + "/to_fhir"
 FHIR_AUTHOR_REF = os.getenv("FHIR_AUTHOR_REF", "Device/DischargeSimplify")
 SAVE_INSTRUCTION_URL = f"{BASE_URL}/discharge_instructions/"
 
@@ -252,10 +252,10 @@ with col2:
 with st.sidebar:
     st.header(t("Discharge Instructions Input"))
     # Top of your app
-    st.sidebar.markdown("## Select Role")
-    role = st.sidebar.radio("You are viewing as:", ["User", "Clinician"])
+    st.sidebar.markdown(t("Select Role"))
+    role = st.sidebar.radio(t("You are viewing as:"), [t("User"), t("Clinician")])
     if role == "Clinician":
-        st.sidebar.markdown("## Clinician Review")
+        st.sidebar.markdown(t("Clinician Review"))
         st.session_state['clinician_review']= True
     else:
         st.session_state['clinician_review'] = False
