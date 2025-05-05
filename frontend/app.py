@@ -122,17 +122,23 @@ def validate_all(items, section_key=None):
             explanation = r.get("explanation", "")
             st.markdown(f"  {t('Explanation')}: _{t(explanation)}_")
 
-         # --- Clinician Review Section ---
+        # --- Clinician Review Section ---
+            if f"review_opts_{item}" not in st.session_state:
+                st.session_state[f"review_opts_{item}"] = [
+                    t("Pending"),
+                    t("Approve"),
+                    t("Reject"),
+                ]
             if st.session_state.get("clinician_review"):
-                st.markdown("**Clinician Review**")
+                st.markdown(t("Clinician Review"))
                 review = st.radio(
-                    label="Approve this instruction?",
-                    options=["Pending", "Approve", "Reject"],
+                    label=t("Approve this instruction?"),
+                    options=st.session_state[f"review_opts_{item}"],
                     key=f"review_{item}"
                 )
-                comment = st.text_area("Comment (optional)", key=f"comment_{item}")
+                comment = st.text_area(t("Comment (optional)"), key=f"comment_{item}")
 
-                if st.button("Submit Review", key=f"submit_{item}"):
+                if st.button(t("Submit Review"), key=f"submit_{item}"):
                     review_payload = {
                         "instruction": item,
                         "match_found": r.get("is_valid"),
@@ -254,7 +260,7 @@ with st.sidebar:
     # Top of your app
     st.sidebar.markdown(t("Select Role"))
     role = st.sidebar.radio(t("You are viewing as:"), [t("User"), t("Clinician")])
-    if role == "Clinician":
+    if role == t("Clinician"):
         st.sidebar.markdown(t("Clinician Review"))
         st.session_state['clinician_review']= True
     else:
